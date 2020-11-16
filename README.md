@@ -3,6 +3,7 @@
 This repository contains data files and Python scripts for Blue Team’s ISE599 final project: Bringing Advance Clarity to Political Crises.  The files are listed below…
 
 #Code:
+Coding for this project was produced by Sean Eskew.
 
 GDELT Proj.py This Python script is critical in creating our cleaned data for further analysis.  It's ultimate purpose is to create a dataframe that includes both GDELT and ACLED data, with network and event information for each country by month ordered in a manner that allows us to run further analysis.
 
@@ -74,3 +75,6 @@ new_dataTS.csv contains the cleaned data prepared for time series analysis
 
 East_Afr 2015 06 01.csv is an example of one month of GDELT data
 
+# Data Mining Exams
+
+USC Analytics curriculum emphasized Python; however, the elective ISE-535 Data Mining taught using R.  Data Mining files within this repository highlight our course work.
