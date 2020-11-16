@@ -1,0 +1,185 @@
+---
+title: "Final Exam - Wed"
+author: 'Sean Eskew : 8439-71-6736'
+date: "4/29/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+chooseCRANmirror(graphics=FALSE, ind=1)
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+```{r}
+library(dplyr)  
+library(ggplot2) 
+library(stringr)
+library(cluster)
+library(factoextra) 
+library(tidyverse)
+library(dslabs)
+library(yardstick)
+```
+
+1.) This exercise is from the book Hands-on ML with R by Boehmke. We will work with a data set containing 28 x 28 = 784 pixels of n = 60000 digits. That is, each image (as shown below) corresponds to a 28-by-28 matrix. Each element in the matrix is a number in [0,255] indicating how dark the pixel is. Each matrix with 784 cells is unscrolled into a row of size 784. The dataset for this question is a dataframe (actually a matrix) of 60000 rows and 784 columns. Think of each row representing a digit as the one shown below.
+
+a.) We will group the rows into 10 clusters. Then we will compare the clusters with the actual digits. Read Sections 20.1 and 20.5 from https://bradleyboehmke.github.io/HOML/kmeans.html to reproduce and report the output given in that book. Do not use all 60000 rows, instead use a subset of 10000 rows selected at random using set.seed(1).
+
+
+```{r}
+mnist <- dslabs::read_mnist()
+
+url <- "https://koalaverse.github.io/homlr/data/my_basket.csv"
+my_basket <- readr::read_csv(url)
+
+features <- mnist$train$images
+set.seed(1)
+sample_1k <- sample(nrow(features), size = 10000)
+features_1k <- features[sample_1k,]
+
+mnist_clustering <- kmeans(features_1k, centers = 10, nstart = 10)
+```
+\newpage
+```{r}
+# Print contents of the model output
+str(mnist_clustering)
+
+```
+
+\newpage
+```{r}
+# Extract cluster centers
+mnist_centers <- mnist_clustering$centers
+
+# Plot typical cluster digits
+par(mfrow = c(2, 5), mar=c(0.5, 0.5, 0.5, 0.5))
+layout(matrix(seq_len(nrow(mnist_centers)), 2, 5, byrow = FALSE))
+for(i in seq_len(nrow(mnist_centers))) {
+  image(matrix(mnist_centers[i, ], 28, 28)[, 28:1], 
+        col = gray.colors(12, rev = TRUE), xaxt="n", yaxt="n")
+}
+
+```
+
+\newpage
+```{r}
+# Create mode function
+mode_fun <- function(x){  
+  which.max(tabulate(x))
+}
+
+mnist_comparison <- data.frame(
+  cluster = mnist_clustering$cluster,
+  actual = mnist$train$labels[sample_1k]) %>%
+  group_by(cluster) %>%
+  mutate(mode = mode_fun(actual)) %>%
+  ungroup() %>%
+  mutate_all(factor, levels = 0:9)
+
+# Create confusion matrix and plot results
+yardstick::conf_mat(
+  mnist_comparison, 
+  truth = actual, 
+  estimate = mode) %>%
+  autoplot(type = 'heatmap')
+```
+
+\newpage
+b.) Use PCA to visualize the data reduced to two dimensions. Create a scatterplot of
+PC1 vs PC2. Label each point with the actual digit number (different color for each different
+digit). Use different color for each actual digit. Which digits are well separated? Which are
+not?
+
+```{r}
+
+# First we must remove all columns that have 0 variance (they cause errors in prcomp)
+feat_pca <- features_1k[ , which(apply(features_1k, 2, var) != 0)]
+
+# Next we find our principle components.  
+# Because all columns have the same scale (0 to 255) we can set the scaling to FALSE
+m1 <- prcomp(feat_pca, scale=FALSE)
+# Scaling to FALSE creates a more noticeable clustering in PC1, PC2 axis
+
+scores <- data.frame(m1$x[,1:3], label = mnist$train$labels[sample_1k])
+scores$label <- as.factor(scores$label)
+
+gg <- ggplot(data = scores, aes(x=PC1, y=PC2, color=label))
+
+gg + geom_point(alpha = .7) +
+  scale_color_brewer(palette = 'Paired')
+```
+Here we can see the most noticeable grouping is the number 1.  The second most noticeable is 0 on the right.  Past that; 7, 9 and 4 share similar space at the top. 2 and 3 share similar space at the bottom.  And 5, 6, and 8 share space in the middle.
+\newpage
+2.) The crime dataset from ggmap has data from the Houston Police Department over the period of January 2010{August 2010. We are interested in violent crimes that take place downtown. Select "robbery","aggravated assault","rape", "murder" categories from column offense.
+
+a.) Create a dot plot showing the location of these offenses in the downtown area (use different dot color for each different offense). Use appropriate legend. Restrict your map to the following coordinates -95.39681 < lon < -95.34188 and 29.73631 < lat < 29.78400
+
+```{r}
+library(ggmap)
+library(lubridate)
+library(ggrepel)
+library(tibble)
+library(ggthemes)
+
+ggmap::register_google(key = 'AIzaSyD-Mis5S9J2LTXd3sTYSBZnJoAIbG80HEQ')
+
+df1 <- as_tibble(ggmap::crime)
+head(df1)
+unique(df1$offense)
+
+df_crime <- filter(df1, offense %in% c('robbery','aggravated assault','rape','murder'))
+```
+\newpage
+```{r}
+crimeMap <- get_map(c(left = -95.39681, bottom = 29.73631, right = -95.34188, top = 29.78400))
+
+gg = ggmap(crimeMap)
+
+gg + geom_point(data = df_crime, aes(x = lon, y = lat, color = offense, alpha = .7)) + 
+  scale_color_brewer(palette = 'Dark2') +
+  guides(alpha = 'none') +
+  labs(title = ('Crimes in Houston, TX'), subtitle = 'By Offense Type')
+```
+
+\newpage
+b.) Recreate this dot plot using facet_wrap() to show the location of each offense in a
+different facet.
+
+```{r}
+gg = ggmap(crimeMap)
+
+gg + geom_point(data = df_crime, aes(x = lon, y = lat, color = offense, alpha = .7)) +
+  facet_wrap(~offense,nrow = 2) +
+  theme(legend.position = 'none') + 
+  scale_color_brewer(palette = 'Dark2') + 
+  theme(axis.text.x = element_text(angle=60, hjust=1)) +
+  labs(title = ('Crimes in Houston, TX'), subtitle = 'By Offense Type')
+```
+
+\newpage
+
+3.) Use ggmap to reproduce the map (continental US map only, you may ignore Alaska). The file question3.csv has both the data and the coordinates (lat and lon). It is available on Black- board. Also, consider using
+
+us <- c(left = -125, bottom = 25.75, right = -67, top = 49)
+
+US.map = get_stamenmap(us, zoom = 5, maptype = "toner-lite")
+
+```{r}
+us <- c(left = -125, bottom = 24, right = -67, top = 49)
+US.map <- get_stamenmap(us, zoom = 5, maptype = "toner-lite")
+
+df2 <- read_csv('question3.csv') # Louisiana Counties are missing from Dataset
+
+pp <- ggmap(US.map)
+
+pp + geom_point(data = df2, aes(x = lon, y = lat, size = cases, alpha = .1), color = 'orchid3') +
+  scale_size_continuous(limits =c(1,max(df2$cases)), range = c(.1,10)) +
+  labs(title = ('Coronavirus Cases in the US'), subtitle = 'By County') +
+  guides(alpha = 'none') + theme_map() +
+  theme(legend.justification = c(1,0), legend.position = c(1,0))
+
+```

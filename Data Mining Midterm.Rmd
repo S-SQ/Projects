@@ -1,0 +1,293 @@
+---
+title: "Eskew Midterm - Wed"
+author: "Sean Eskew : 8439-71-6736"
+date: "3/11/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+chooseCRANmirror(graphics=FALSE, ind=1)
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+1. The OJ data set from the ISLR library contains 1070 purchases where the customer either purchased
+Citrus Hill or Minute Maid Orange Juice (Use ?OJ for more details). It is of interest to pre-
+dict Purchase using all other variables. Use set.seed(1,sample.kind="Rounding") to create
+a training set containing a random sample of 800 observations, and a test set containing the
+remaining observations.
+
+Fit a classification tree to the training data to answer questions (a) to (c).
+```{r echo = T}
+RNGkind(sample.kind = 'Rounding')
+
+library(tree)
+library(ISLR)
+library(ggplot2)
+library(tidyverse)
+
+d0 <- OJ
+str(d0)
+d0$Purchase <- as.factor(d0$Purchase)
+
+# train and test sets
+set.seed(1,sample.kind="Rounding") 
+n = 1:nrow(d0)
+
+train <- sample(n,800)
+d0.train <- d0[train,]
+
+y.train <- d0$Purchase[train]
+d0.test <- d0[-train,]
+y.test <- d0$Purchase[-train]
+# train the classification tree
+tree <- tree(Purchase~.,d0,subset=train)
+```
+
+\newpage
+a) Plot the tree. What is the training error rate? What is the test error rate?
+```{r}
+# Create the tree plot
+plot(tree)
+text(tree, cex=.75)
+
+# train error rate
+pred <- predict(tree, d0.train, type='class')
+table(pred,y.train)
+# prop.table(table(pred,y.train))
+aux <- prop.table(table(pred,y.train))
+1 - sum(diag(aux))
+```
+The training error rate is _**0.165**_.
+```{r}
+# test error rate
+pred2 <- predict(tree, d0.test, type='class')
+table(pred2,y.test)
+#prop.table(table(pred2,y.test))
+aux <- prop.table(table(pred2,y.test))
+1 - sum(diag(aux))
+```
+As expected, the test error rate of _**0.226**_, is higher than the training rate.
+
+\newpage
+b) Use set.seed(2) and cross-validation to find the best number of terminal nodes.
+
+Which tree size corresponds to the lowest cross-validated classification error rate?
+```{r}
+# CV on misclassifiacation error rate
+set.seed(2)
+tree2 <- cv.tree(tree,FUN = prune.misclass) # compare misclassification
+names(tree2)
+tree2$size
+tree2$dev
+round(tree2$k,2)
+
+# plot against k
+par(mfrow = c(1,2))
+plot(tree2$dev~tree2$size,type='l')
+plot(tree2$dev~tree2$k,type='l')
+
+# Lowest Total Misclassifications
+min(tree2$dev)
+
+# Index of Lowest Misclassifications
+min.idx <- which.min(tree2$dev)
+min.idx
+
+# Best number of Terminal Nodes
+tree2$size[min.idx]
+
+# Total misclassification rate
+tree2$dev[min.idx] / nrow(d0.train)
+```
+Here we find that the best number of _**terminal nodes/leafs is 2**_, this has the lowest number of misclassifications at 150, and a k value of 4.67.
+
+So a tree size of 2 terminal nodes leads to the smallest CV error rate of _**0.1875**_.
+
+\newpage
+c) Plot a pruned tree with five terminal nodes. What is the test error rate?
+
+```{r}
+# use prune.misclass to prune tree2 to 9 terminal nodes
+prune5 <- prune.misclass(tree, best =5)
+par(mfrow = c(1,1))
+plot(prune5)
+text(prune5,cex=.8,pretty=0)
+
+# test error rate of this pruned tree
+yhat5 <- predict(prune5, d0.test,type='class')
+table(yhat5,y.test)
+aux <- prop.table(table(yhat5,y.test))
+1 - sum(diag(aux))
+```
+Our error rate for the pruned tree is _**0.2259**_.
+
+\newpage
+For the following question, fit a RF to the training set using all predictors.
+
+d) Which predictors are the most important? What is the test error rate? 
+```{r}
+library(randomForest)
+
+# BAGGING - all 17 predictors are considered at each split
+set.seed(1)
+bag1 <- randomForest(Purchase~.,d0,subset=train,mtry=17,importance=T)
+# train performance
+plot(bag1)
+
+#importance(bag1) # Shows same information as plot. Removed for presentation
+varImpPlot(bag1,main='')
+
+bag1
+```
+The most important predictors if we use _**Mean Decrease Accuracy**_ as our metric are _**LoyalCH, PriceDiff, then STORE**_.  If instead we use _**Mean Decrease Gini**_ as our metric then _**LoyalCH, WeekofPurchase, and PriceDiff**_ are our most important variables. 
+
+Our error rate using all 17 predictors is _**.2088**_.
+
+\newpage
+e) Fit a boosted tree selecting the best parameter values. What is the test error rate?
+
+When fitting a boosted tree the number of trees, depth of trees, shrinkage, should be carefully selected. If a tuning grid is defined, the train function can be used to tune these parameters (see p217, handout).
+```{r}
+library(gbm)
+library(caret)
+
+# Grid
+gbmGrid <- expand.grid(n.minobsinnode = 10, interaction.depth = seq(1,8,by=1),
+                       n.trees = seq(100,1000, by=50),
+                       shrinkage = c(0.001,0.01,.1))
+
+objControl <- trainControl(method='cv', number=3, returnResamp='none', 
+                           summaryFunction = twoClassSummary, classProbs = TRUE)
+
+set.seed(1)
+gbmTuned <- train(Purchase~., data = d0.train, metric = "ROC", trControl=objControl, 
+                  method = 'gbm', tuneGrid = gbmGrid, verbose = FALSE)
+
+# final values n.trees = 250, interaction.depth = 3, shrinkage = .01 and n.minobsinnode = 10.
+
+# importance of predictors
+summary(gbmTuned)
+# test error rate of this boosted tree
+yhat <- predict(gbmTuned,newdata=d0.test, n.trees=250)
+table(yhat,y.test)
+aux <- prop.table(table(yhat,y.test))
+1 - sum(diag(aux))
+```
+With boosting we see that our most important predictors are also _**LoyalCH, PriceDiff, then ListPriceDiff.**_  Our error rate is improved to _**0.1630**_.
+
+\newpage
+In segmenting the market, a breakfast cereal manufacturer uses health and diet consciousness as the segmentation variable. Four segments are developed:
+
+  1 = Concerned about eating healthy foods
+  2 = Concerned primarily about weight
+  3 = Concerned about health because of illness
+  4 = Unconcerned
+  
+To distinguish between groups, a survey is conducted (see cereal.csv). In the survey, people are categorized as belonging to one of these groups. The most recent census reveals that 234,564,000 Americans are 18 and older.
+
+a) Use the prop.test function to find a 95% Confidence interval for the true proportion of American adults who are concerned about eating healthy foods. Then use it to estimate how many American adults belong to group 1.
+```{r}
+library(dplyr)
+
+# read d
+d1 <- read.csv('cereal.csv')
+
+head(d1,3)
+
+d1$Breakfast <- NULL # Breakfast variable unnecessary
+d1$Group <- as.factor(d1$Group)
+str(d1)
+
+# number of people per Concern Group
+aux <- table(d1$Group)
+aux
+
+n1 = aux[1] # Total in Group 1
+n2 = aux[2] + aux[3] + aux[4] # Sum of all other groups
+
+x = n1 # Assign Group 1 size to x
+n = n1+n2 # Assign Sample Size to n
+
+prop.test(x,n, conf.level=.95) # Find confidence interval
+
+# Translate to actual numbers in the USA
+n_usa <- 234564000
+pred <- n_usa * .2152
+low <- n_usa * .1929252
+high <- n_usa * .2392505
+
+c(low, pred, high)
+```
+The 95% confidence interval for the true population of adults who are concerned about eating healthy foods in the USA is between _**0.1930 and 0.2393**_.
+
+This puts our estimated group population at _**50,478,173**_ with a low end estimate of 45,253,307 and a high end estimate of 56,119,554.
+
+\newpage
+b) Each respondent was also asked the amount spent on breakfast cereal in an average month. The company would like to know whether on average the market segment concerned about eating healthy foods outspends the other market segments.
+```{r}
+d2 <- d1 
+
+d2$Group <- ifelse(d2$Group == "1", "A", "B") # Convert our group 1 to A group, 
+#and all others to B
+head(d2,3) # Check for change
+
+aux2 <- tapply(d2$Spend, d2$Group, mean) # Find average differences
+aux2
+
+n1 = aux2[1]
+n2 = aux2[2]
+obs_diff <- n1 - n2
+obs_diff
+
+# boxplots
+
+ggplot(d2, aes(x=Group, y=Spend)) +
+  geom_boxplot() + 
+  labs(y='Time (seconds)') +
+  theme_bw()
+
+# Permutations
+function1 <- function(x, n1, n2)
+{
+  n <- n1+n2
+  idx_b <- sample(1:n,n1)
+  idx_a <- setdiff(1:n, idx_b)
+  mean_diff <- mean(x[idx_b]) - mean(x[idx_a])
+  return(mean_diff)
+}
+
+set.seed(1)
+difference <- rep(0,1000)
+x = d2$Spend
+for(i in 1:1000) difference[i] = function1(x, 269, 712)
+hist(difference)  
+abline(v = obs_diff, col = 'red')
+# Here we expect to reject the null hypothesis as our estimated p value is at
+# the edge of our data set, likely being small
+mean(difference > obs_diff) # Estimated p value
+
+t.test(Spend~Group, data = d2, alternative = 'greater') # More precie values
+```
+From this test we can see that the null hypothesis of the average spending between group 1 and the remainder of the groups is _**rejected**_ due to the low p-value (below .05).
+
+This means that on average the members of group 1 _**do outspend**_ the other market segments.
+
+\newpage
+3. The following table is a sample of the dataframe Hitters from library ISLR. It shows the data of nine baseball players chosen at random. Select the rownumber equal to the first digit of your USC ID. Then use the data in that row and the regression tree shown below to predict the salary (in 000s of dollars) of the selected player.
+
+The row selected is row #8.
+
+Below is the path of the tree travelled to solve the problem:
+
+1 - CHits < 450 : Row8 value 42 : Left
+
+2 - AtBat < 147 : Row8 value 214 : Right
+
+3 - CRBI < 114.5 : Row8 value 9 : Left
+
+Expected Salary of Row8 - 141.8
+
