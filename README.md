@@ -1,6 +1,6 @@
 # GDELTProject
 
-This repository contains data files and Python scripts for Blue Team’s ISE599 final project: Bringing Advance Clarity to Political Crises.  The files are listed below…
+This repository contains data files and Python scripts for Blue Team’s ISE599 final project: Bringing Advance Clarity to Political Crises.  The full project writeup is labeled Team Blue Report.pdf.  The additional files are listed below…
 
 ## Code:
 
