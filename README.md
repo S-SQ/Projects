@@ -2,8 +2,7 @@
 
 This repository contains data files and Python scripts for Blue Team’s ISE599 final project: Bringing Advance Clarity to Political Crises.  The files are listed below…
 
-#Code:
-Coding for this project was produced by Sean Eskew.
+## Code:
 
 GDELT Proj.py This Python script is critical in creating our cleaned data for further analysis.  It's ultimate purpose is to create a dataframe that includes both GDELT and ACLED data, with network and event information for each country by month ordered in a manner that allows us to run further analysis.
 
@@ -64,6 +63,7 @@ Importance Analysis.pynb This file runs importance analysis with the top perform
 
 Initial Project Stuff.pynb  This file was used to create some of the initial map visualizations from the ACLED data Set
 
+Scripts/notebooks, with the exception of GDELTProject2, were created by Sean Eskew.
 
 #Data:
 
@@ -74,6 +74,7 @@ new_dataTS.csv contains the cleaned data prepared for time series analysis
 2015-03-01-2019-11-30-Central_African_Republic-Democratic_Republic_of_Congo-Ethiopia-South_Sudan - ACLED Data.csv is a file of battle death counts from ACLED.
 
 East_Afr 2015 06 01.csv is an example of one month of GDELT data
+
 
 # Data Mining Exams
 
