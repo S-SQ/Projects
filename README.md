@@ -65,7 +65,7 @@ Initial Project Stuff.pynb  This file was used to create some of the initial map
 
 Scripts/notebooks, with the exception of GDELTProject2, were created by Sean Eskew.
 
-#Data:
+## Data:
 
 battle_data.csv contains the cleaned data used for our analysis
 
